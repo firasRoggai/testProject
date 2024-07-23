@@ -2,6 +2,8 @@
 
 import { Button, TextField } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
+import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
+
 import {
     Table,
     TableBody,
@@ -43,28 +45,55 @@ const DataTable = () => {
         getData();
     }, [pageNumber]);
 
+    const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
+        // prevent reload
+        e.preventDefault();
+
+        // get data
+        const response = await fetch(`/api/person/search?query=${searchQuery}&page=${pageNumber}`);
+        const data = await response.json();
+
+        setPersonTable(data.personTable);
+    }
+
+    interface PersonTable {
+        personList : Person[];
+    }
+
+    const {
+        control,
+        handleSubmit,
+        watch,
+        formState: { errors },
+      } = useForm<PersonTable>()
+      const onSubmit: SubmitHandler<PersonTable> = (data) => console.log(data)
+    
+      const { fields, append, prepend, remove, swap, move, insert } = useFieldArray({
+        control, // control props comes from useForm (optional: if you are using FormProvider)
+        name: "personList", // unique name for your Field Array
+      });
+
+      console.log(watch("personList")) // watch input value by passing the name of it
+    
+
+      
     if (isLoading) {
         return <div className="min-h-[30vh] flex justify-center items-center">
             <p className="text-lg">Loading...</p>
         </div>;
     }
-
-    const handleSearch = async () => {
-        const response = await fetch(`/api/person/search?query=${searchQuery}&page=${pageNumber}`);
-        const data = await response.json();
-        setPersonTable(data.personTable);
-    }
-
     return (
         <div className="grid justify-center py-8">
-            <div className="flex gap-3 py-6">
-                <TextField.Root className="w-full" placeholder="Search for people" onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                }} />
-                <Button onClick={handleSearch} className="w-[10rem]">
-                    Search
-                </Button>
-            </div>
+            <form onSubmit={handleSearch}>
+                <div className="flex gap-3 py-6">
+                    <TextField.Root className="w-full" placeholder="Search for people" onChange={(e) => {
+                        setSearchQuery(e.target.value)
+                    }} />
+                    <Button type="submit" className="w-[10rem]">
+                        Search
+                    </Button>
+                </div>
+            </form>
             <Table className="w-[80vw]">
                 <TableHeader>
                     <TableRow>
@@ -116,7 +145,7 @@ const DataTable = () => {
 
             <Button onClick={() => {
                 const requestData = personTable ? personTable[0] : null;
-                
+
                 fetch("/api/person/generate", {
                     method: "POST",
                     headers: {
@@ -124,19 +153,19 @@ const DataTable = () => {
                     },
                     body: JSON.stringify(requestData)
                 })
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = 'mailLabel.pdf';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                })
-                .catch(error => console.error('Error:', error));
-                
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'mailLabel.pdf';
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                    })
+                    .catch(error => console.error('Error:', error));
+
             }}>
                 Click
             </Button>
