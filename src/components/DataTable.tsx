@@ -67,7 +67,13 @@ const DataTable = () => {
     useEffect(() => {
         const getData = async () => {
             try {
-                handleSearch()
+                const response = await fetch(`/api/person/search?query=${searchQuery}&page=${pageNumber}`);
+                const data = await response.json();
+
+                replace(data.personTable);
+
+                setPersonTable(data.personTable);
+
             } catch (error) {
                 console.error(error);
             } finally {
@@ -247,7 +253,7 @@ const DataTable = () => {
                     }
                 </TableBody>
             </Table>
-            <div className="flex gap-x-3">
+            <div className="flex gap-x-3 flex-end">
                 <Button onClick={handleAdd}>
                     Add
                 </Button>
