@@ -11,7 +11,7 @@ const label = `
             {{first_name}} {{last_name}}
         </h1>
         Company: {{company}}
-        <br> Adress: {{adress}}
+        <br> address: {{address}}
         <br> State: {{state}}
         <br> City: {{city}}
         <br> Zip Phone: {{zip_phone}}

@@ -1,8 +1,9 @@
 "use client";
 
 import { Button, TextField } from "@radix-ui/themes";
-import { useEffect, useState } from "react";
-import { useForm, SubmitHandler, useFieldArray } from "react-hook-form"
+import { useDebounce } from "@uidotdev/usehooks";
+import { useEffect, useRef, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
 
 import {
     Table,
@@ -12,29 +13,67 @@ import {
     TableHeader,
     TableRow
 } from "~/components/ui/table";
-
-type Person = {
-    first_name: string,
-    last_name: string,
-    company: string,
-    adress: string,
-    city: string,
-    state: string,
-    zip_phone: string,
-}
+import useEscHandler from "~/hooks/useEscCallback";
 
 const DataTable = () => {
+    // states
     const [personTable, setPersonTable] = useState<Person[] | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState<string>('')
+    const [addedFields, setAddedFields] = useState<string[]>([])
     const [pageNumber, setPageNumber] = useState<number>(1)
+    const debouncedSearchTerm = useDebounce(searchQuery, 300);
 
+
+    // use-form states
+    interface PersonTable {
+        personList: Person[];
+    }
+
+    const {
+        control,
+        getValues,
+        watch,
+        register,
+        formState: { isDirty },
+    } = useForm<PersonTable>()
+
+    // focus on search-bar when esc is pressed
+    const searchInput = useRef<null | HTMLInputElement>(null);
+
+    useEscHandler(() => {
+        if (searchInput.current) {
+            searchInput.current.focus()
+            setSearchQuery("");
+        }
+    })
+
+    const onSubmit = async () => {
+        const data = getValues("personList");
+
+        console.log(data);
+        await fetch('/api/person/edit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+    }
+
+    const { fields, append, replace } = useFieldArray({
+        control, // control props comes from useForm (optional: if you are using FormProvider)
+        name: "personList", // unique name for your Field Array
+    });
+    // handles fetching data on page load / search
     useEffect(() => {
         const getData = async () => {
             try {
                 const response = await fetch(`/api/person/search?query=${searchQuery}&page=${pageNumber}`);
                 const data = await response.json();
+
+                replace(data.personTable);
+
                 setPersonTable(data.personTable);
+
             } catch (error) {
                 console.error(error);
             } finally {
@@ -43,50 +82,53 @@ const DataTable = () => {
         };
 
         getData();
-    }, [pageNumber]);
 
-    const handleSearch = async (e: React.FormEvent<HTMLFormElement>) => {
+    }, [pageNumber, debouncedSearchTerm]);
+
+    const handleSearch = async (e?: React.FormEvent<HTMLFormElement>) => {
         // prevent reload
-        e.preventDefault();
+        if (e) e.preventDefault();
 
         // get data
         const response = await fetch(`/api/person/search?query=${searchQuery}&page=${pageNumber}`);
         const data = await response.json();
 
+        replace(data.personTable);
+        setPageNumber(1);
         setPersonTable(data.personTable);
     }
 
-    interface PersonTable {
-        personList : Person[];
+    const handleAdd = async () => {
+
+        append({
+            id: fields.length + 1,
+            first_name: "",
+            last_name: "",
+            company: "",
+            address: "",
+            city: "",
+            state: "",
+            zip_phone: ""
+        })
+
+        console.log(fields);
+
+        setAddedFields([...addedFields, fields[fields.length - 1]?.id as unknown as string])
     }
 
-    const {
-        control,
-        handleSubmit,
-        watch,
-        formState: { errors },
-      } = useForm<PersonTable>()
-      const onSubmit: SubmitHandler<PersonTable> = (data) => console.log(data)
-    
-      const { fields, append, prepend, remove, swap, move, insert } = useFieldArray({
-        control, // control props comes from useForm (optional: if you are using FormProvider)
-        name: "personList", // unique name for your Field Array
-      });
+    console.log(watch("personList"));
 
-      console.log(watch("personList")) // watch input value by passing the name of it
-    
-
-      
     if (isLoading) {
         return <div className="min-h-[30vh] flex justify-center items-center">
             <p className="text-lg">Loading...</p>
         </div>;
     }
+
     return (
         <div className="grid justify-center py-8">
             <form onSubmit={handleSearch}>
                 <div className="flex gap-3 py-6">
-                    <TextField.Root className="w-full" placeholder="Search for people" onChange={(e) => {
+                    <TextField.Root ref={searchInput} className="w-full" placeholder="Search for people" value={searchQuery} onChange={(e) => {
                         setSearchQuery(e.target.value)
                     }} />
                     <Button type="submit" className="w-[10rem]">
@@ -94,6 +136,7 @@ const DataTable = () => {
                     </Button>
                 </div>
             </form>
+
             <Table className="w-[80vw]">
                 <TableHeader>
                     <TableRow>
@@ -106,27 +149,90 @@ const DataTable = () => {
                         <TableHead>ZIP Phone</TableHead>
                     </TableRow>
                 </TableHeader>
-                <TableBody>
-                    {personTable && personTable.length > 0 ? (
-                        personTable.map(person => (
-                            <TableRow key={person.first_name}>
-                                <TableCell>{person.first_name}</TableCell>
-                                <TableCell>{person.last_name}</TableCell>
-                                <TableCell>{person.company}</TableCell>
-                                <TableCell>{person.adress}</TableCell>
-                                <TableCell>{person.city}</TableCell>
-                                <TableCell>{person.state}</TableCell>
-                                <TableCell>{person.zip_phone}</TableCell>
+                <TableBody className="">
+                    {
+                        personTable && personTable.length > 0 ? (
+                            <>
+                                {
+                                    fields.map((field, index) => (
+                                        <TableRow key={field.id}>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.first_name}
+                                                    {...register(`personList.${index}.first_name`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.last_name}
+                                                    {...register(`personList.${index}.last_name`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.address}
+                                                    {...register(`personList.${index}.address`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.company}
+                                                    {...register(`personList.${index}.company`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.state}
+                                                    {...register(`personList.${index}.state`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.city}
+                                                    {...register(`personList.${index}.city`)}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <input
+                                                    className="w-full h-full bg-transparent focus:outline-none"
+                                                    key={field.id}
+                                                    defaultValue={field.zip_phone}
+                                                    {...register(`personList.${index}.zip_phone`)}
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                }
+                            </>
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={7}>No data</TableCell>
                             </TableRow>
-                        ))
-                    ) : (
-                        <TableRow>
-                            <TableCell colSpan={7}>No data</TableCell>
-                        </TableRow>
-                    )}
+                        )
+                    }
                 </TableBody>
             </Table>
-
+            <div className="flex gap-x-3">
+                <Button onClick={handleAdd}>
+                    Add
+                </Button>
+                <Button onClick={onSubmit}>
+                    Save Changes
+                </Button>
+            </div>
+            {/* Previous / Next */}
             <div className="flex justify-center gap-3 py-4">
                 <Button onClick={() => {
                     if (pageNumber >= 2) {
@@ -143,32 +249,38 @@ const DataTable = () => {
                 </Button>
             </div>
 
-            <Button onClick={() => {
-                const requestData = personTable ? personTable[0] : null;
+            <Button
+                onClick={() => {
+                    const requestData = personTable ? personTable[0] : null;
 
-                fetch("/api/person/generate", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(requestData)
-                })
-                    .then(response => response.blob())
-                    .then(blob => {
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.style.display = 'none';
-                        a.href = url;
-                        a.download = 'mailLabel.pdf';
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
+                    fetch("/api/person/generate", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify(requestData),
                     })
-                    .catch(error => console.error('Error:', error));
+                        .then((response) => response.blob())
+                        .then((blob) => {
+                            const url = window.URL.createObjectURL(blob);
 
-            }}>
-                Click
+                            const printWindow = window.open(url, "_blank");
+
+                            if (printWindow) {
+                                printWindow.onload = () => {
+                                    printWindow.print();
+                                    window.URL.revokeObjectURL(url); 
+                                };
+                            } else {
+                                console.error('Failed to open the print window');
+                            }
+                        })
+                        .catch((error) => console.error("Error:", error));
+                }}
+            >
+                Print Label
             </Button>
+
         </div>
 
     );
