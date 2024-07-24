@@ -253,7 +253,7 @@ const DataTable = () => {
                     }
                 </TableBody>
             </Table>
-            <div className="flex gap-x-3">
+            <div className="flex gap-x-3 flex-end">
                 <Button onClick={handleAdd}>
                     Add
                 </Button>
