@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, TextField } from "@radix-ui/themes";
+import { Button, Link, TextField } from "@radix-ui/themes";
 import { useDebounce } from "@uidotdev/usehooks";
 import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
@@ -212,6 +212,35 @@ const DataTable = () => {
                                                     {...register(`personList.${index}.zip_phone`)}
                                                 />
                                             </TableCell>
+                                            <TableCell>
+                                                <Button onClick={() => {
+                                                    fetch("/api/person/generate", {
+                                                        method: "POST",
+                                                        headers: {
+                                                            "Content-Type": "application/json",
+                                                        },
+                                                        body: JSON.stringify(field),
+                                                    })
+                                                        .then((response) => response.blob())
+                                                        .then((blob) => {
+                                                            const url = window.URL.createObjectURL(blob);
+
+                                                            const printWindow = window.open(url, "_blank");
+
+                                                            if (printWindow) {
+                                                                printWindow.onload = () => {
+                                                                    printWindow.print();
+                                                                    window.URL.revokeObjectURL(url);
+                                                                };
+                                                            } else {
+                                                                console.error('Failed to open the print window');
+                                                            }
+                                                        })
+                                                        .catch((error) => console.error("Error:", error));
+                                                }} className="cursor-pointer">
+                                                    Print
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     ))
                                 }
@@ -248,38 +277,6 @@ const DataTable = () => {
                     Next {'>'}
                 </Button>
             </div>
-
-            <Button
-                onClick={() => {
-                    const requestData = personTable ? personTable[0] : null;
-
-                    fetch("/api/person/generate", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify(requestData),
-                    })
-                        .then((response) => response.blob())
-                        .then((blob) => {
-                            const url = window.URL.createObjectURL(blob);
-
-                            const printWindow = window.open(url, "_blank");
-
-                            if (printWindow) {
-                                printWindow.onload = () => {
-                                    printWindow.print();
-                                    window.URL.revokeObjectURL(url); 
-                                };
-                            } else {
-                                console.error('Failed to open the print window');
-                            }
-                        })
-                        .catch((error) => console.error("Error:", error));
-                }}
-            >
-                Print Label
-            </Button>
 
         </div>
 
