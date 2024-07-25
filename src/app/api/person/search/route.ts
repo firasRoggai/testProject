@@ -1,11 +1,9 @@
 export const dynamic = 'force-dynamic'
 
-import { db } from '@vercel/postgres';
+import { db , sql } from '@vercel/postgres';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  // connect to the db
-  const client = await db.connect();
 
   // get query params
   const url = new URL(req.url);
@@ -16,7 +14,8 @@ export async function GET(req: NextRequest) {
   // calculate offset
   const offset = (page - 1) * pageSize;
 
-  const personTable = await client.sql`
+  // construct and execute the query using the sql template literal tag
+  const personTable = await sql`
     SELECT * FROM person
     WHERE
       first_name ILIKE '%' || ${searchString} || '%' OR
